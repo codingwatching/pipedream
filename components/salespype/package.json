@@ -1,0 +1,19 @@
+{
+  "name": "@pipedream/salespype",
+  "version": "0.1.0",
+  "description": "Pipedream Salespype Components",
+  "main": "salespype.app.mjs",
+  "keywords": [
+    "pipedream",
+    "salespype"
+  ],
+  "homepage": "https://pipedream.com/apps/salespype",
+  "author": "Pipedream <support@pipedream.com> (https://pipedream.com/)",
+  "publishConfig": {
+    "access": "public"
+  },
+  "dependencies": {
+    "@pipedream/platform": "^3.0.3",
+    "md5": "^2.3.0"
+  }
+}
