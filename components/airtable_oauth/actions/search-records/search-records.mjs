@@ -4,8 +4,8 @@ import { fieldTypeToPropType } from "../../common/utils.mjs";
 export default {
   key: "airtable_oauth-search-records",
   name: "Search Records",
-  description: "Searches for a record by formula or by field value. [See the documentation](https://airtable.com/developers/web/api/list-records)",
-  version: "0.0.7",
+  description: "Search for a record by formula or by field value. [See the documentation](https://airtable.com/developers/web/api/list-records)",
+  version: "0.0.10",
   type: "action",
   props: {
     ...common.props,
@@ -32,7 +32,7 @@ export default {
       props.searchFormula = {
         type: "string",
         label: "Search Formula",
-        description: "Use an Airtable search formula to find records. For example, if you want to find records with `Tags` includes `test-1`, use `FIND('test-1', {Tags})`. Learn more on [Airtable's website](https://support.airtable.com/docs/formula-field-reference)",
+        description: "Use an [Airtable search formula (see info on the documentation)](https://support.airtable.com/docs/formula-field-reference) to find records. For example, if you want to find records with `Tags` including `test-1`, use `FIND('test-1', {Tags})`.",
         optional: true,
       };
     }
@@ -90,21 +90,17 @@ export default {
 
     const params = {
       filterByFormula,
-      returnFieldsByFieldId: this.returnFieldsByFieldId,
+      returnFieldsByFieldId: this.returnFieldsByFieldId || false,
     };
-    const results = [];
-    do {
-      const {
-        records, offset,
-      } = await this.airtable.listRecords({
-        baseId: this.baseId.value,
-        tableId: this.tableId.value,
-        params,
-        $,
-      });
-      results.push(...records);
-      params.offset = offset;
-    } while (params.offset);
+
+    const baseId = this.baseId?.value ?? this.baseId;
+    const tableId = this.tableId?.value ?? this.tableId;
+
+    const results = await this.airtable.listRecords({
+      baseId,
+      tableId,
+      params,
+    });
 
     $.export("$summary", `Found ${results.length} record${results.length === 1
       ? ""

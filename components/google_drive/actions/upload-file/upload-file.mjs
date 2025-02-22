@@ -4,16 +4,21 @@ import {
   getFileStream,
   omitEmptyStringValues,
 } from "../../common/utils.mjs";
-import { GOOGLE_DRIVE_UPLOAD_TYPE_MULTIPART } from "../../constants.mjs";
+import { GOOGLE_DRIVE_UPLOAD_TYPE_MULTIPART } from "../../common/constants.mjs";
+import {
+  additionalProps, updateType,
+} from "../../common/filePathOrUrl.mjs";
 
 export default {
   key: "google_drive-upload-file",
   name: "Upload File",
-  description: "Copy an existing file to Google Drive. [See the docs](https://developers.google.com/drive/api/v3/manage-uploads) for more information",
-  version: "0.1.3",
+  description: "Upload a file to Google Drive. [See the documentation](https://developers.google.com/drive/api/v3/manage-uploads) for more information",
+  version: "1.0.0",
   type: "action",
+  additionalProps,
   props: {
     googleDrive,
+    updateType,
     drive: {
       propDefinition: [
         googleDrive,
@@ -38,12 +43,16 @@ export default {
         googleDrive,
         "fileUrl",
       ],
+      optional: false,
+      hidden: true,
     },
     filePath: {
       propDefinition: [
         googleDrive,
         "filePath",
       ],
+      optional: false,
+      hidden: true,
     },
     name: {
       propDefinition: [
@@ -88,9 +97,6 @@ export default {
       mimeType,
     } = this;
     let { uploadType } = this;
-    if (!fileUrl && !filePath) {
-      throw new Error("One of File URL and File Path is required.");
-    }
     const driveId = this.googleDrive.getDriveId(this.drive);
 
     const filename = name || path.basename(fileUrl || filePath);
@@ -98,7 +104,9 @@ export default {
     const file = await getFileStream({
       $,
       fileUrl,
-      filePath,
+      filePath: filePath?.startsWith("/tmp/")
+        ? filePath
+        : `/tmp/${filePath}`,
     });
     console.log(`Upload type: ${uploadType}.`);
 
