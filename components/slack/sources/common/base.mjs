@@ -92,6 +92,15 @@ export default {
         return info.user.name;
       });
     },
+    async getRealName(id) {
+      return this.maybeCached(`users_real_names:${id}`, async () => {
+        const info = await this.slack.sdk().users.info({
+          user: id,
+        });
+        if (!info.ok) throw new Error(info.error);
+        return info.user.real_name;
+      });
+    },
     async getBotName(id) {
       return this.maybeCached(`bots:${id}`, async () => {
         const info = await this.slack.sdk().bots.info({
@@ -166,7 +175,7 @@ export default {
       }
 
       this.$emit(event, {
-        id: event.client_msg_id || event.pipedream_msg_id,
+        id: event.client_msg_id || event.pipedream_msg_id || event.channel.id,
         summary: this.getSummary(event),
         ts: event.event_ts || Date.now(),
       });
