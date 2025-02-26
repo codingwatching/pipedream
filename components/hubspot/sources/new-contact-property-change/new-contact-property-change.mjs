@@ -1,12 +1,13 @@
 import common from "../common/common.mjs";
-import { API_PATH } from "../../common/constants.mjs";
+import { DEFAULT_LIMIT } from "../../common/constants.mjs";
+import sampleEmit from "./test-event.mjs";
 
 export default {
   ...common,
   key: "hubspot-new-contact-property-change",
   name: "New Contact Property Change",
   description: "Emit new event when a specified property is provided or updated on a contact. [See the documentation](https://developers.hubspot.com/docs/api/crm/contacts)",
-  version: "0.0.7",
+  version: "0.0.14",
   dedupe: "unique",
   type: "source",
   props: {
@@ -21,7 +22,6 @@ export default {
       },
     },
   },
-  hooks: {},
   methods: {
     ...common.methods,
     getTs(contact) {
@@ -49,50 +49,48 @@ export default {
     getParams(after) {
       return {
         object: "contacts",
-        limit: 50,
-        properties: [
-          this.property,
-        ],
-        sorts: [
-          {
-            propertyName: "lastmodifieddate",
-            direction: "DESCENDING",
-          },
-        ],
-        filterGroups: [
-          {
-            filters: [
-              {
-                propertyName: this.property,
-                operator: "HAS_PROPERTY",
-              },
-              {
-                propertyName: "lastmodifieddate",
-                operator: "GTE",
-                value: after,
-              },
-            ],
-          },
-        ],
+        data: {
+          limit: DEFAULT_LIMIT,
+          properties: [
+            this.property,
+          ],
+          sorts: [
+            {
+              propertyName: "lastmodifieddate",
+              direction: "DESCENDING",
+            },
+          ],
+          filterGroups: [
+            {
+              filters: [
+                {
+                  propertyName: this.property,
+                  operator: "HAS_PROPERTY",
+                },
+                {
+                  propertyName: "lastmodifieddate",
+                  operator: "GTE",
+                  value: after,
+                },
+              ],
+            },
+          ],
+        },
       };
     },
-    async batchGetContacts(inputs) {
-      return this.hubspot.makeRequest(
-        API_PATH.CRMV3,
-        "/objects/contacts/batch/read",
-        {
-          method: "POST",
-          data: {
-            properties: [
-              this.property,
-            ],
-            propertiesWithHistory: [
-              this.property,
-            ],
-            inputs,
-          },
+    batchGetContacts(inputs) {
+      return this.hubspot.batchGetObjects({
+        objectType: "contacts",
+        data: {
+          properties: [
+            this.property,
+          ],
+          propertiesWithHistory: [
+            this.property,
+          ],
+          inputs,
         },
-      );
+      });
     },
     async processResults(after, params) {
       const properties = await this.hubspot.getContactProperties();
@@ -107,33 +105,13 @@ export default {
         return;
       }
 
-      const batchSize = 45;
-      let maxTs = after;
+      const results = await this.processChunks({
+        batchRequestFn: this.batchGetContacts,
+        chunks: this.getChunks(updatedContacts),
+      });
 
-      for (let i = 0; i < updatedContacts.length; i += batchSize) {
-        const batchInputs = updatedContacts.slice(i, i + batchSize).map(({ id }) => ({
-          id,
-        }));
-
-        // get contacts w/ `propertiesWithHistory`
-        const { results } = await this.batchGetContacts(batchInputs);
-
-        maxTs = after;
-
-        for (const result of results) {
-          if (this.isRelevant(result, after)) {
-            this.emitEvent(result);
-            const ts = this.getTs(result);
-            if (ts > maxTs) {
-              maxTs = ts;
-            }
-          }
-        }
-
-        after = maxTs;
-      }
-
-      this._setAfter(maxTs);
+      this.processEvents(results, after);
     },
   },
+  sampleEmit,
 };

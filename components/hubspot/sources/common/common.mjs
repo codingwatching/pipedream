@@ -1,5 +1,4 @@
 import hubspot from "../../hubspot.app.mjs";
-import Bottleneck from "bottleneck";
 import { DEFAULT_POLLING_SOURCE_TIMER_INTERVAL } from "@pipedream/platform";
 
 export default {
@@ -14,26 +13,62 @@ export default {
     },
   },
   methods: {
-    _limiter() {
-      return new Bottleneck({
-        minTime: 250, // max 4 requests per second
-      });
-    },
-    async _requestWithLimiter(limiter, resourceFn, params) {
-      return limiter.schedule(async () => await resourceFn(params));
-    },
     _getAfter() {
       return this.db.get("after") || new Date().setDate(new Date().getDate() - 1); // 1 day ago
     },
     _setAfter(after) {
       this.db.set("after", after);
     },
+    async getWriteOnlyProperties(resourceName) {
+      const { results: properties } = await this.hubspot.getProperties({
+        objectType: resourceName,
+      });
+      return properties.filter(({ modificationMetadata }) => !modificationMetadata.readOnlyValue);
+    },
+    getChunks(items) {
+      const MAX_CHUNK_SIZE = 45;
+      return Array.from({
+        length: Math.ceil(items.length / MAX_CHUNK_SIZE),
+      })
+        .map((_, index) => index * MAX_CHUNK_SIZE)
+        .map((begin) => items.slice(begin, begin + MAX_CHUNK_SIZE));
+    },
+    processChunk({
+      batchRequestFn,
+      mapper = ({ id }) => ({
+        id,
+      }),
+    }) {
+      return async (chunk) => {
+        const { results } = await batchRequestFn(chunk.map(mapper));
+        return results;
+      };
+    },
+    async processChunks({
+      chunks, ...args
+    }) {
+      const promises = chunks.map(this.processChunk(args));
+      const results = await Promise.all(promises);
+      return results.flat();
+    },
+    async processEvents(resources, after) {
+      let maxTs = after;
+      for (const result of resources) {
+        if (await this.isRelevant(result, after)) {
+          this.emitEvent(result);
+          const ts = this.getTs(result);
+          if (ts > maxTs) {
+            maxTs = ts;
+          }
+        }
+      }
+      this._setAfter(maxTs);
+    },
     async paginate(params, resourceFn, resultType = null, after = null) {
       let results = null;
       let maxTs = after || 0;
-      const limiter = this._limiter();
       while (!results || params.after) {
-        results = await this._requestWithLimiter(limiter, resourceFn, params);
+        results = await resourceFn(params);
         if (results.paging) {
           params.after = results.paging.next.after;
         } else {
@@ -69,10 +104,9 @@ export default {
       let results, items;
       let count = 0;
       let maxTs = after || 0;
-      const limiter = this._limiter();
       while (hasMore && (!limitRequest || count < limitRequest)) {
         count++;
-        results = await this._requestWithLimiter(limiter, resourceFn, params);
+        results = await resourceFn(params);
         hasMore = results.hasMore;
         if (hasMore) {
           params.offset = results.offset;
@@ -83,7 +117,7 @@ export default {
           items = results;
         }
         for (const item of items) {
-          if (this.isRelevant(item, after)) {
+          if (await this.isRelevant(item, after)) {
             this.emitEvent(item);
             const ts = this.getTs(item);
             if (ts > maxTs) {
@@ -136,7 +170,7 @@ export default {
   },
   async run() {
     const after = this._getAfter();
-    const params = this.getParams(after);
+    const params = await this.getParams(after);
     await this.processResults(after, params);
   },
 };

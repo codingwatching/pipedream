@@ -6,8 +6,9 @@ export default {
   name: "New or Modified Records in View",
   description: "Emit new event for each new or modified record in a view",
   key: "airtable_oauth-new-or-modified-records-in-view",
-  version: "0.0.5",
+  version: "0.0.8",
   type: "source",
+  dedupe: "unique",
   props: {
     ...base.props,
     tableId: {
@@ -51,16 +52,16 @@ export default {
     const params = {
       view: viewId,
       filterByFormula: `LAST_MODIFIED_TIME() > "${lastTimestamp}"`,
-      returnFieldsByFieldId: this.returnFieldsByFieldId,
+      returnFieldsByFieldId: this.returnFieldsByFieldId || false,
     };
 
-    const data = await this.airtable.listRecords({
+    const records = await this.airtable.listRecords({
       baseId,
       tableId,
       params,
     });
 
-    if (!data.records.length) {
+    if (!records.length) {
       console.log("No new or modified records.");
       return;
     }
@@ -72,7 +73,7 @@ export default {
     };
 
     let newRecords = 0, modifiedRecords = 0;
-    for (const record of data.records) {
+    for (const record of records) {
       if (!lastTimestamp || moment(record.createdTime) > moment(lastTimestamp)) {
         record.type = "new_record";
         newRecords++;

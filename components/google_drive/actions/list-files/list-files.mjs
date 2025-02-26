@@ -5,7 +5,7 @@ export default {
   key: "google_drive-list-files",
   name: "List Files",
   description: "List files from a specific folder. [See the documentation](https://developers.google.com/drive/api/v3/reference/files/list) for more information",
-  version: "0.1.4",
+  version: "0.1.11",
   type: "action",
   props: {
     googleDrive,
@@ -31,7 +31,7 @@ export default {
     fields: {
       type: "string",
       label: "Fields",
-      description: "The paths of the fields you want included in the response. If not specified, the response includes a default set of fields specific to this method. For development you can use the special value `*` to return all fields, but you'll achieve greater performance by only selecting the fields you need.\n\n**eg:** `files(id,mimeType,name,webContentLink,webViewLink)`",
+      description: "The fields you want included in the response [(see the documentation for available fields)](https://developers.google.com/drive/api/reference/rest/v3/files). If not specified, the response includes a default set of fields specific to this method. For development you can use the special value `*` to return all fields, but you'll achieve greater performance by only selecting the fields you need.\n\n**eg:** `files(id,mimeType,name,webContentLink,webViewLink)`",
       optional: true,
     },
     filterText: {
@@ -39,13 +39,30 @@ export default {
       description: "Filter by file name that contains a specific text",
       type: "string",
       optional: true,
+      reloadProps: true,
     },
     trashed: {
       label: "Trashed",
       type: "boolean",
-      description: "List trashed files or non-trashed files. Keep it empty to include both.",
+      description: "If `true`, list **only** trashed files. If `false`, list **only** non-trashed files. Keep it empty to include both.",
       optional: true,
     },
+  },
+  async additionalProps() {
+    const props = {};
+    if (this.filterText) {
+      props.filterType = {
+        type: "string",
+        label: "Filter Type",
+        description: "Whether to return files with names containing the Filter Text or files with names that match the Filter Text exactly. Defaults to \"CONTAINS\"",
+        options: [
+          "CONTAINS",
+          "EXACT MATCH",
+        ],
+        default: "CONTAINS",
+      };
+    }
+    return props;
   },
   async run({ $ }) {
     const opts = getListFilesOpts(this.drive, {
@@ -57,7 +74,9 @@ export default {
     if (this.filterText) {
       opts.q += `${opts.q
         ? " AND "
-        : ""}name contains '${this.filterText}'`;
+        : ""}name ${this.filterType === "CONTAINS"
+        ? "contains"
+        : "="} '${this.filterText}'`;
     }
     if (typeof this.trashed !== "undefined") {
       opts.q += `${opts.q

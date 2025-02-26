@@ -1,6 +1,6 @@
 import shopify from "../../shopify_developer_app.app.mjs";
 import metafieldActions from "../common/metafield-actions.mjs";
-import common from "../../../shopify/actions/update-product-variant/common.mjs";
+import common from "@pipedream/shopify/actions/update-product-variant/common.mjs";
 
 export default {
   ...common,
@@ -8,7 +8,7 @@ export default {
   key: "shopify_developer_app-update-product-variant",
   name: "Update Product Variant",
   description: "Update an existing product variant. [See the docs](https://shopify.dev/api/admin-rest/2022-01/resources/product-variant#[put]/admin/api/2022-01/variants/{variant_id}.json)",
-  version: "0.0.2",
+  version: "0.0.6",
   type: "action",
   props: {
     shopify,
@@ -67,10 +67,11 @@ export default {
       ],
       description: "The country code [ISO 3166-1 alpha-2](https://en.wikipedia.org/wiki/ISO_3166-1_alpha-2) of where the item came from",
     },
-    harmonizedSystemCode: {
-      type: "integer",
-      label: "Harmonized System Code",
-      description: "The general [harmonized system](https://en.wikipedia.org/wiki/Harmonized_System) code for the inventory item",
+    locationId: {
+      propDefinition: [
+        shopify,
+        "locationId",
+      ],
       optional: true,
     },
     ...common.props,

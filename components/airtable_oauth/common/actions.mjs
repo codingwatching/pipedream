@@ -23,6 +23,7 @@ export default {
           // Use record propDefinition directly to workaround lack of support
           // for propDefinition in additionalProps
           record: airtable.propDefinitions.record,
+          customExpressionInfo: airtable.propDefinitions.customExpressionInfo,
         };
       }
       throw new ConfigurationError("Could not find a table for the specified base ID and table ID. Please adjust the action configuration to continue.");
@@ -36,19 +37,16 @@ export default {
 
     ctx.airtable.validateRecord(record);
 
-    const data = {
-      fields: record,
-      typecast: ctx.typecast,
-      returnFieldsByFieldId: ctx.returnFieldsByFieldId,
-    };
-
     let response;
     try {
       response = await ctx.airtable.createRecord({
         baseId,
         tableId,
-        data,
-        $,
+        data: record,
+        opts: {
+          typecast: ctx.typecast,
+          returnFieldsByFieldId: ctx.returnFieldsByFieldId,
+        },
       });
     } catch (err) {
       ctx.airtable.throwFormattedError(err);
@@ -71,12 +69,11 @@ export default {
         baseId,
         tableId,
         recordId,
-        data: {
-          fields: record,
+        data: record,
+        opts: {
           typecast: ctx.typecast,
           returnFieldsByFieldId: ctx.returnFieldsByFieldId,
         },
-        $,
       });
     } catch (err) {
       ctx.airtable.throwFormattedError(err);
@@ -85,28 +82,17 @@ export default {
     $.export("$summary", `Updated record "${recordId}" in ${ctx.baseId?.label || baseId}: [${ctx.tableId?.label || tableId}](https://airtable.com/${baseId}/${tableId})`);
     return response;
   },
-  getRecord: async (ctx, $, throwRawError = false) => {
+  getRecord: async (ctx, $) => {
     const baseId = ctx.baseId?.value ?? ctx.baseId;
     const tableId = ctx.tableId?.value ?? ctx.tableId;
     const recordId = ctx.recordId;
 
-    let response;
-    try {
-      response = await ctx.airtable.getRecord({
-        baseId,
-        tableId,
-        recordId,
-        params: {
-          returnFieldsByFieldId: ctx.returnFieldsByFieldId,
-        },
-        $,
-      });
-    } catch (err) {
-      if (throwRawError) {
-        throw err;
-      }
-      ctx.airtable.throwFormattedError(err);
-    }
+    ctx.airtable.validateRecordID(recordId);
+    const response = await ctx.airtable.getRecord({
+      baseId,
+      tableId,
+      recordId,
+    });
 
     $.export("$summary", `Fetched record "${recordId}" from ${ctx.baseId?.label || baseId}: [${ctx.tableId?.label || tableId}](https://airtable.com/${baseId}/${tableId})`);
     return response;

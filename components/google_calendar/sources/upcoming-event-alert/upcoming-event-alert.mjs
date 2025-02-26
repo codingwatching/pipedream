@@ -1,5 +1,6 @@
 import taskScheduler from "../../../pipedream/sources/new-scheduled-tasks/new-scheduled-tasks.mjs";
 import googleCalendar from "../../google_calendar.app.mjs";
+import sampleEmit from "./test-event.mjs";
 
 export default {
   key: "google_calendar-upcoming-event-alert",
@@ -7,7 +8,7 @@ export default {
   description: `Emit new event based on a time interval before an upcoming event in the calendar. This source uses Pipedream's Task Scheduler.
     [See the documentation](https://pipedream.com/docs/examples/waiting-to-execute-next-step-of-workflow/#step-1-create-a-task-scheduler-event-source) 
     for more information and instructions for connecting your Pipedream account.`,
-  version: "0.0.6",
+  version: "0.0.10",
   type: "source",
   props: {
     pipedream: taskScheduler.props.pipedream,
@@ -20,15 +21,11 @@ export default {
         "calendarId",
       ],
     },
-    eventId: {
+    eventTypes: {
       propDefinition: [
         googleCalendar,
-        "eventId",
-        (c) => ({
-          calendarId: c.calendarId,
-        }),
+        "eventTypes",
       ],
-      optional: true,
     },
     time: {
       type: "integer",
@@ -94,27 +91,21 @@ export default {
     async getCalendarEvents() {
       const calendarEvents = [];
       const params = {
+        returnOnlyData: false,
         calendarId: this.calendarId,
+        eventTypes: this.eventTypes,
       };
-      if (this.eventId) {
-        const item = await this.googleCalendar.getEvent({
-          ...params,
-          eventId: this.eventId,
-        });
-        calendarEvents.push(item);
-      } else {
-        do {
-          const {
-            data: {
-              items, nextPageToken,
-            },
-          } = await this.googleCalendar.getEvents(params);
-          if (items?.length) {
-            calendarEvents.push(...items);
-          }
-          params.pageToken = nextPageToken;
-        } while (params.pageToken);
-      }
+      do {
+        const {
+          data: {
+            items, nextPageToken,
+          },
+        } = await this.googleCalendar.listEvents(params);
+        if (items?.length) {
+          calendarEvents.push(...items);
+        }
+        params.pageToken = nextPageToken;
+      } while (params.pageToken);
       return calendarEvents;
     },
   },
@@ -157,4 +148,5 @@ export default {
     this._setScheduledEventIds(scheduledEventIds);
     this._setScheduledCalendarEventIds(scheduledCalendarEventIds);
   },
+  sampleEmit,
 };
